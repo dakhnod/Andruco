@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory
+        android:title="MQTT">
+        <EditTextPreference
+            android:key="mqtt_uri"
+            android:title="MQTT URI"
+            android:summary="Usually tcp://HOST:1883"
+            android:defaultValue="tcp://"/>
+
+        <EditTextPreference
+            android:key="mqtt_prefix"
+            android:title="MQTT path prefix"
+            android:defaultValue="aruco/markers"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="Origin marker 0">
+        <EditTextPreference
+            android:key="origin_0_marker_id"
+            android:inputType="number"
+            android:title="Origin marker 0 aruco index"
+            android:defaultValue="0" />
+
+        <EditTextPreference
+            android:key="origin_0_marker_x"
+            android:inputType="numberDecimal"
+            android:title="Origin marker 0 X coordinate"
+            android:defaultValue="0" />
+
+        <EditTextPreference
+            android:key="origin_0_marker_y"
+            android:inputType="numberDecimal"
+            android:title="Origin marker 0 Y coordinate"
+            android:defaultValue="0" />
+
+        <EditTextPreference
+            android:key="origin_0_marker_z"
+            android:inputType="numberDecimal"
+            android:title="Origin marker 0 Z coordinate"
+            android:defaultValue="0" />
+    </PreferenceCategory>
+</PreferenceScreen>

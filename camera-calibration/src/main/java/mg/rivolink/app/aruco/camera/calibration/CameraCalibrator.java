@@ -126,8 +126,8 @@ public class CameraCalibrator{
 	public void render(Mat rgb, Mat gray){
 		detectMarkers(rgb, gray);
 		
-		Imgproc.putText(rgb, "Captured: "+captured, new Point(rgb.cols()/3*2, rgb.rows()*0.1),
-					 Core.FONT_HERSHEY_SIMPLEX, 1.0, new Scalar(255, 255, 0));
+		Imgproc.putText(rgb, "Captured: " + captured + "/15", new Point(10, rgb.rows()*0.95),
+					 Core.FONT_HERSHEY_SIMPLEX, 2.0, new Scalar(0, 0, 0));
 	}
 	
 	private boolean saveFrame(){

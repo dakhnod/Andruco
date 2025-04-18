@@ -5,9 +5,12 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.DialogInterface;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 
+import android.util.Log;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.Toast;
 
@@ -19,6 +22,18 @@ import mg.rivolink.app.aruco.renderer.Renderer3D;
 import mg.rivolink.app.aruco.utils.CameraParameters;
 import mg.rivolink.app.aruco.view.PortraitCameraLayout;
 
+import org.eclipse.paho.android.service.MqttAndroidClient;
+import org.eclipse.paho.client.mqttv3.IMqttActionListener;
+import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.IMqttToken;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
@@ -28,6 +43,7 @@ import org.opencv.aruco.Aruco;
 import org.opencv.aruco.DetectorParameters;
 import org.opencv.aruco.Dictionary;
 import org.opencv.calib3d.Calib3d;
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfDouble;
@@ -61,7 +77,12 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 	private Renderer3D renderer;
 	private CameraBridgeViewBase camera;
-	
+
+	SharedPreferences prefs;
+	float originMarkerIndex;
+	Mat originMarker0Position;
+	String mqttPrefix;
+
 	private final BaseLoaderCallback loaderCallback = new BaseLoaderCallback(this){
         @Override
         public void onManagerConnected(int status){
@@ -85,6 +106,13 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 			}
         }
     };
+	private MqttAndroidClient mqttClient;
+
+	public void openSettingsView(View v) {
+		startActivity(
+				new Intent(this, PreferencesActivity.class)
+		);
+	}
 
     @Override
     protected void onCreate(Bundle savedInstanceState){
@@ -103,6 +131,15 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 		surface.setTransparent(true);
 		surface.setSurfaceRenderer(renderer);
 
+		prefs = this.getSharedPreferences(getPackageName() + "_preferences", MODE_PRIVATE);
+		this.originMarkerIndex = Integer.parseInt(prefs.getString("origin_0_marker_id", "0"));
+
+		this.mqttPrefix = prefs.getString("mqtt_prefix", "aruco/markers");
+		if(!this.mqttPrefix.endsWith("/")) {
+			this.mqttPrefix = this.mqttPrefix + "/";
+		}
+
+		connectMQTT();
 	}
 
 	@Override
@@ -122,18 +159,28 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 	
 	@Override
     public void onPause(){
-        super.onPause();
+		super.onPause();
 
-        if(camera != null)
-            camera.disableView();
+		finish();
     }
 
 	@Override
     public void onDestroy(){
         super.onDestroy();
 
+
         if (camera != null)
             camera.disableView();
+
+		/*
+        try {
+            mqttClient.disconnect();
+        } catch (MqttException e) {
+            e.printStackTrace();
+        }
+		 */
+
+		mqttClient.close();
     }
 
 	@Override
@@ -142,6 +189,11 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 		corners = new LinkedList<>();
 		parameters = DetectorParameters.create();
 		dictionary = Aruco.getPredefinedDictionary(Aruco.DICT_6X6_50);
+
+		this.originMarker0Position = new Mat(3, 1, CvType.CV_64F);
+		this.originMarker0Position.put(0, 0, Float.parseFloat(prefs.getString("origin_0_marker_x", "0")));
+		this.originMarker0Position.put(1, 0, Float.parseFloat(prefs.getString("origin_0_marker_y", "0")));
+		this.originMarker0Position.put(2, 0, Float.parseFloat(prefs.getString("origin_0_marker_z", "0")));
 	}
 
 	@Override
@@ -158,17 +210,115 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 		Aruco.detectMarkers(gray, dictionary, corners, ids, parameters);
 
-		if(corners.size()>0){
-			Aruco.drawDetectedMarkers(rgb, corners, ids);
+		if(corners.size() == 0) {
+			return rgb;
+		}
 
-			rvecs = new Mat();
-			tvecs = new Mat();
+		Aruco.drawDetectedMarkers(rgb, corners, ids);
 
-			Aruco.estimatePoseSingleMarkers(corners, SIZE, cameraMatrix, distCoeffs, rvecs, tvecs);
-			for(int i = 0;i<ids.toArray().length;i++){
-				draw3dCube(rgb, cameraMatrix, distCoeffs, rvecs.row(i), tvecs.row(i), new Scalar(255, 0, 0));
-				Aruco.drawAxis(rgb, cameraMatrix, distCoeffs, rvecs.row(i), tvecs.row(i), SIZE/2.0f);
+		rvecs = new Mat();
+		tvecs = new Mat();
+
+		Aruco.estimatePoseSingleMarkers(corners, SIZE, cameraMatrix, distCoeffs, rvecs, tvecs);
+
+		Mat originTvec = new Mat(3, 1, CvType.CV_64F);
+		Mat originRvec = new Mat(3, 1, CvType.CV_64F);
+
+		boolean originFound = false;
+
+		for(int i = 0; i < ids.rows(); i++) {
+			if(ids.get(i, 0)[0] == this.originMarkerIndex) {
+				originTvec.put(0, 0, tvecs.get(i, 0));
+				originRvec.put(0, 0, rvecs.get(i, 0));
+
+				originFound = true;
 			}
+		}
+
+		 if(originFound) {
+			 Mat R0 = new Mat();
+			 Calib3d.Rodrigues(
+					 originRvec,
+					 R0
+			 );
+			 Mat R0_inv = R0.t();
+
+			 Mat T0 = originTvec.t();
+			 Mat T0_inv = new Mat();
+			 Core.gemm(R0_inv, originTvec, -1, new Mat(), 0, T0_inv);
+
+			 for (int i = 0; i < ids.rows(); i++) {
+				 Mat tvec = new Mat(3, 1, CvType.CV_64F);
+				 Mat rvec = new Mat(3, 1, CvType.CV_64F);
+
+				 tvec.put(0, 0, tvecs.get(i, 0));
+				 rvec.put(0, 0, rvecs.get(i, 0));
+
+				 // Convert to rotation matrix
+				 Mat R = new Mat();
+				 Calib3d.Rodrigues(rvec, R);
+
+				 // Transform rotation
+				 Mat R_rel = new Mat();
+				 Core.gemm(R0_inv, R, 1, new Mat(), 0, R_rel);
+
+				 // Transform translation
+				 Mat t = tvec.t();
+				 Mat t_diff = new Mat();
+				 Core.subtract(t, originTvec.t(), t_diff);
+
+				 Mat t_rel = new Mat();
+				 Core.gemm(R0_inv, t_diff.t(), 1, new Mat(), 0, t_rel);
+
+				 // Convert back to rvec
+				 Mat rvec_rel = new Mat();
+				 Calib3d.Rodrigues(R_rel, rvec_rel);
+
+				 Mat t_offset = new Mat();
+				 Core.add(t_rel, originMarker0Position, t_offset);
+
+				 // At this point: rvec_rel and t_rel give pose relative to marker 0
+				 int markerId = (int) ids.get(i, 0)[0];
+				 if(markerId != this.originMarkerIndex) {
+					 // Log.d("Relative", String.format("XYZ: %f %f %f", t_rel.get(0, 0)[0], t_rel.get(1, 0)[0], t_rel.get(2, 0)[0]));
+					 if(mqttClient.isConnected()) {
+						 try {
+							 JSONObject position = new JSONObject();
+							 position.put("x", t_offset.get(0, 0)[0]);
+							 position.put("y", t_offset.get(1, 0)[0]);
+							 position.put("z", t_offset.get(2, 0)[0]);
+
+							 JSONObject rotation = new JSONObject();
+							 rotation.put("x", rvec_rel.get(0, 0)[0]);
+							 rotation.put("y", rvec_rel.get(1, 0)[0]);
+							 rotation.put("z", rvec_rel.get(2, 0)[0]);
+
+							 JSONObject object = new JSONObject();
+							 object.put("position", position);
+							 object.put("rotation", rotation);
+
+							 mqttClient.publish(this.mqttPrefix + markerId, object.toString().getBytes(), 0, false);
+						 } catch (JSONException e) {
+							 throw new RuntimeException(e);
+						 } catch (MqttPersistenceException e) {
+							 throw new RuntimeException(e);
+						 } catch (MqttException e) {
+							 throw new RuntimeException(e);
+						 }
+					 }
+                 }
+				 /*
+				 Log.d("Relative", "Marker ID " + ids.get(i, 0)[0] + " relative to marker 0:");
+				 Log.d("Relative", "Rotation vector: " + rvec_rel.dump());
+				 Log.d("Relative", "Translation vector: " + t_rel.t().dump()); // transpose back to row
+				 */
+			 }
+		 }
+
+
+		for(int i = 0;i<ids.toArray().length;i++){
+			draw3dCube(rgb, cameraMatrix, distCoeffs, rvecs.row(i), tvecs.row(i), new Scalar(255, 0, 0));
+			Aruco.drawAxis(rgb, cameraMatrix, distCoeffs, rvecs.row(i), tvecs.row(i), SIZE/2.0f);
 		}
 
 		return rgb;
@@ -223,6 +373,76 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 			}
 		});
 	}
+
+	private void toast(String text) {
+		Toast.makeText(this, text, Toast.LENGTH_LONG).show();
+
+	}
+
+	private void connectMQTT(){
+		String URI = prefs.getString("mqtt_uri", "");
+		if(URI.isEmpty()) {
+			toast("No MQTT URI configured");
+			return;
+		}
+
+		mqttClient = new MqttAndroidClient(
+				this,
+				URI,
+				"test"
+		);
+		mqttClient.setCallback(new MqttCallbackExtended() {
+			@Override
+			public void connectComplete(boolean reconnect, String serverURI) {
+				Log.d("MQTT", "reconnect: " + reconnect);
+				toast("MQTT (re)connected.");
+			}
+
+			@Override
+			public void connectionLost(Throwable cause) {
+				Log.d("MQTT", "connectionLost: " + cause);
+				toast("mqtt connection lost. reconnecting...");
+
+			}
+
+			@Override
+			public void messageArrived(String topic, MqttMessage message) throws Exception {
+				Log.d("MQTT", "messageArrived: " + topic);
+
+			}
+
+			@Override
+			public void deliveryComplete(IMqttDeliveryToken token) {
+				Log.d("MQTT", "deliveryComplete: " + token);
+
+			}
+		});
+		MqttConnectOptions options =new MqttConnectOptions();
+		options.setAutomaticReconnect(true);
+		options.setCleanSession(false);
+
+        try {
+			mqttClient.connect(options, new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken asyncActionToken) {
+                    Log.d("MQTT", "Connection success");
+					toast("MQTT connected");
+                }
+
+                @Override
+                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+					Log.d("MQTT", "Connection failure: ");
+					exception.printStackTrace();
+					toast("MQTT connection failure. URI correct?");
+                }
+            });
+        } catch (MqttException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+			e.printStackTrace();
+			toast("MQTT configuration wrong, probably.");
+		}
+    }
 	
 }
 
