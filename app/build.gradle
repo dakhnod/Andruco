@@ -5,7 +5,7 @@ android {
     buildToolsVersion "30.0.3"
 
     defaultConfig {
-        applicationId "mg.rivolink.app.aruco"
+        applicationId "d.d.aruco"
         minSdkVersion 15
         targetSdkVersion 30
         versionCode 1

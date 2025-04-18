@@ -5,7 +5,7 @@ android {
     buildToolsVersion "30.0.3"
 
     defaultConfig {
-        applicationId "mg.rivolink.app.aruco.camera.calibration"
+        applicationId "d.d.aruco.camera.calibration"
         minSdkVersion 14
         targetSdkVersion 30
         versionCode 1

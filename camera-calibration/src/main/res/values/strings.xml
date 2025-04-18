@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Aruco Camera Calibration</string>
+    <string name="app_name">AruCo MQTT callibration</string>
 	
 	<string name="success_ocv_loading">Success: OpenCV loaded.</string>
 	<string name="success_calibration">Success: Calibrated with prediction error: </string>
