@@ -1,12 +1,40 @@
 # Aruco Android
 
-> It is an application to detect Aruco Markers.
+> It is an application to detect Aruco Markers and stream the data to MQTT.
 
 <center>
 	<img width="75%" src="screenshots/marker_drawing_axis.png" alt="screenshot_home" />
 </center>
 
+## Usage
+
+Open the callibration app and tap on the image, until the thin text on the bottom left shows 15/15 pictures.
+If there is no text, just take 15 pictures, before clicking on OK.
+Save the file somewhere on the SD card.
+
+
+Afterwards, you can open the main App.
+It will ask for the callibration file first.
+
+Also, it will complaing about not having camera permissions.
+Give the permissions manually.
+
+Then, you can tap on the wrench and set your settings.
+Setting coordinates for the origin marker shifts the whole coordinate system.
+
+Currently, coordinates are only published when the origin marker is visible.
+Coordinates of other markers than the origin will be aligned to the origins coordinate system.
+
+If no markers are found, change the dictionary type.
+
+I made minimal effort to make this work, so feel free to open an issue if something is broken.
+
+GLHF!
+
 ## Credits
+
+This application is mostly made here: https://github.com/RivoLink/Aruco-Android
+I only inserted the configuration, added the coordinate normalization and MQTT stuff.
 
 This application uses:
 
