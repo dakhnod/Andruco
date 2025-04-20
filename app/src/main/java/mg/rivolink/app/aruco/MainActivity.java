@@ -160,8 +160,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 	@Override
     public void onPause(){
 		super.onPause();
-
-		finish();
     }
 
 	@Override
@@ -180,7 +178,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         }
 		 */
 
-		mqttClient.close();
+		if(mqttClient != null) {
+			mqttClient.close();
+		}
     }
 
 	@Override
@@ -188,7 +188,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 		rgb = new Mat();
 		corners = new LinkedList<>();
 		parameters = DetectorParameters.create();
-		dictionary = Aruco.getPredefinedDictionary(Aruco.DICT_6X6_50);
+		dictionary = Aruco.getPredefinedDictionary(
+				Integer.parseInt(prefs.getString("dictionary_type", "0"))
+		);
 
 		this.originMarker0Position = new Mat(3, 1, CvType.CV_64F);
 		this.originMarker0Position.put(0, 0, Float.parseFloat(prefs.getString("origin_0_marker_x", "0")));

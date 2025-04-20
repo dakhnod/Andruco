@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android">
     <PreferenceCategory
         android:title="MQTT">
         <EditTextPreference
@@ -12,6 +13,17 @@
             android:key="mqtt_prefix"
             android:title="MQTT path prefix"
             android:defaultValue="aruco/markers"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="Tag type"
+        xmlns:app="http://schemas.android.com/apk/res-auto">
+        <ListPreference
+            android:title="Tag dictionary"
+            android:key="dictionary_type"
+            android:entries="@array/dictionary_keys"
+            android:entryValues="@array/dictionary_values"
+            android:defaultValue="0" />
     </PreferenceCategory>
 
     <PreferenceCategory
