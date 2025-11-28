@@ -1,6 +1,6 @@
 # Aruco Android
 
-> It is an application to detect Aruco Markers and stream the data to MQTT.
+It is an application to detect Aruco Markers and stream the data to MQTT.
 
 <center>
 	<img width="75%" src="screenshots/marker_drawing_axis.png" alt="screenshot_home" />
@@ -8,15 +8,17 @@
 
 ## Usage
 
-Open the callibration app and tap on the image, until the thin text on the bottom left shows 15/15 pictures.
+When any of the two applications reports an error with the camera, try giving it camera permissions by hand (through the OS settings).
+
+Open the calibration app and tap on the image, until the thin text on the bottom left shows 15/15 pictures.
 If there is no text, just take 15 pictures, before clicking on OK.
 Save the file somewhere on the SD card.
 
 
 Afterwards, you can open the main App.
-It will ask for the callibration file first.
+It will ask for the calibration file first.
 
-Also, it will complaing about not having camera permissions.
+Also, it will complaining about not having camera permissions.
 Give the permissions manually.
 
 Then, you can tap on the wrench and set your settings.
@@ -24,6 +26,7 @@ Setting coordinates for the origin marker shifts the whole coordinate system.
 
 Currently, coordinates are only published when the origin marker is visible.
 Coordinates of other markers than the origin will be aligned to the origins coordinate system.
+The origin marker will not be published via MQTT, since it's location is known (`0, 0` by default)
 
 If no markers are found, change the dictionary type.
 
