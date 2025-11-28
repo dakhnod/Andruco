@@ -10,9 +10,9 @@
             android:defaultValue="tcp://"/>
 
         <EditTextPreference
-            android:key="mqtt_prefix"
-            android:title="MQTT path prefix"
-            android:defaultValue="aruco/markers"/>
+            android:key="mqtt_path"
+            android:title="MQTT path"
+            android:defaultValue="aruco"/>
     </PreferenceCategory>
 
     <PreferenceCategory

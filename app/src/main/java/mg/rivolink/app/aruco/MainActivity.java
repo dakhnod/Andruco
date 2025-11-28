@@ -15,6 +15,7 @@ import android.view.WindowManager;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -32,6 +33,7 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
@@ -134,10 +136,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 		prefs = this.getSharedPreferences(getPackageName() + "_preferences", MODE_PRIVATE);
 		this.originMarkerIndex = Integer.parseInt(prefs.getString("origin_0_marker_id", "0"));
 
-		this.mqttPrefix = prefs.getString("mqtt_prefix", "aruco/markers");
-		if(!this.mqttPrefix.endsWith("/")) {
-			this.mqttPrefix = this.mqttPrefix + "/";
-		}
+		this.mqttPrefix = prefs.getString("mqtt_path", "aruco/markers");
 
 		connectMQTT();
 	}
@@ -249,6 +248,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 			 Mat T0_inv = new Mat();
 			 Core.gemm(R0_inv, originTvec, -1, new Mat(), 0, T0_inv);
 
+			 JSONObject markers = new JSONObject();
+			 boolean publishMqtt = false;
+
 			 for (int i = 0; i < ids.rows(); i++) {
 				 Mat tvec = new Mat(3, 1, CvType.CV_64F);
 				 Mat rvec = new Mat(3, 1, CvType.CV_64F);
@@ -299,12 +301,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 							 object.put("position", position);
 							 object.put("rotation", rotation);
 
-							 mqttClient.publish(this.mqttPrefix + markerId, object.toString().getBytes(), 0, false);
+							 markers.put(String.valueOf(markerId), object);
+							 publishMqtt = true;
 						 } catch (JSONException e) {
-							 throw new RuntimeException(e);
-						 } catch (MqttPersistenceException e) {
-							 throw new RuntimeException(e);
-						 } catch (MqttException e) {
 							 throw new RuntimeException(e);
 						 }
 					 }
@@ -314,6 +313,18 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 				 Log.d("Relative", "Rotation vector: " + rvec_rel.dump());
 				 Log.d("Relative", "Translation vector: " + t_rel.t().dump()); // transpose back to row
 				 */
+			 }
+
+			 // only publish if at least one marker is available
+			 if(publishMqtt) {
+				 try {
+					 JSONObject payload = new JSONObject();
+					 payload.put("markers", markers);
+					 payload.put("timestamp", (new Date()).getTime());
+					 mqttClient.publish(this.mqttPrefix, payload.toString().getBytes(), 0, false);
+				 } catch (JSONException | MqttException e) {
+					 throw new RuntimeException(e);
+				 }
 			 }
 		 }
 
@@ -415,8 +426,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 			@Override
 			public void deliveryComplete(IMqttDeliveryToken token) {
-				Log.d("MQTT", "deliveryComplete: " + token);
-
+				// Log.d("MQTT", "deliveryComplete: " + token);
 			}
 		});
 		MqttConnectOptions options =new MqttConnectOptions();
