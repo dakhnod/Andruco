@@ -1,9 +1,7 @@
 package mg.rivolink.app.aruco;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.DialogInterface;
 
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -29,12 +27,10 @@ import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.IMqttToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -74,8 +70,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 	private Dictionary dictionary;
 	private DetectorParameters parameters;
 
-	private Renderer3D renderer;
-	private CameraBridgeViewBase camera;
+    private CameraBridgeViewBase camera;
 
 	SharedPreferences prefs;
 	float originMarkerIndex;
@@ -134,7 +129,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         camera.setVisibility(SurfaceView.VISIBLE);
         camera.setCvCameraViewListener(this);
 
-		renderer = new Renderer3D(this);
+        Renderer3D renderer = new Renderer3D(this);
 
 		SurfaceView surface = (SurfaceView)findViewById(R.id.main_surface);
 		surface.setTransparent(true);
@@ -221,7 +216,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 		Aruco.detectMarkers(gray, dictionary, corners, ids, parameters);
 
-		if(corners.size() == 0) {
+		if(corners.isEmpty()) {
 			return rgb;
 		}
 
@@ -263,7 +258,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 		);
 		Mat R0_inv = R0.t();
 
-		Mat T0 = originTvec.t();
 		Mat T0_inv = new Mat();
 		Core.gemm(R0_inv, originTvec, -1, new Mat(), 0, T0_inv);
 
@@ -356,7 +350,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 	public void draw3dCube(Mat frame, Mat cameraMatrix, MatOfDouble distCoeffs, Mat rvec, Mat tvec, Scalar color){
 		double halfSize = SIZE/2.0;
 
-		List<Point3> points = new ArrayList<Point3>();
+		List<Point3> points = new ArrayList<>();
 		points.add(new Point3(-halfSize, -halfSize, 0));
 		points.add(new Point3(-halfSize,  halfSize, 0));
 		points.add(new Point3( halfSize,  halfSize, 0));
@@ -379,23 +373,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 	        Imgproc.line(frame, pts.get(i+4), pts.get(4+(i+1)%4), color, 2);
 	        Imgproc.line(frame, pts.get(i), pts.get(i+4), color, 2);
 	    }	        
-	}
-	
-	private void transformModel(final Mat tvec, final Mat rvec){
-		runOnUiThread(new Runnable(){
-			@Override
-			public void run(){
-				renderer.transform(
-					tvec.get(0, 0)[0]*50,
-					-tvec.get(0, 0)[1]*50,
-					-tvec.get(0, 0)[2]*50,
-				
-					rvec.get(0, 0)[2], //yaw
-					rvec.get(0, 0)[1], //pitch
-					rvec.get(0, 0)[0] //roll
-				);
-			}
-		});
 	}
 
 	private void toast(String text) {
@@ -436,7 +413,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 			}
 
 			@Override
-			public void messageArrived(String topic, MqttMessage message) throws Exception {
+			public void messageArrived(String topic, MqttMessage message) {
 				Log.d("MQTT", "messageArrived: " + topic);
 
 			}
