@@ -8,8 +8,8 @@ android {
         applicationId "d.d.aruco"
         minSdkVersion 15
         targetSdkVersion 30
-        versionCode 1
-        versionName "1.1"
+        versionCode 3
+        versionName "1.2"
     }
     buildTypes {
         release {
