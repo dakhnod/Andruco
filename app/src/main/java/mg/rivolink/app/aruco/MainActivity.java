@@ -6,12 +6,14 @@ import android.content.Intent;
 import android.content.DialogInterface;
 
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -85,6 +87,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 	Mat originMarker0Position;
 	String mqttPrefix;
 
+	private TextView mqttStatusText;
+
 	private final BaseLoaderCallback loaderCallback = new BaseLoaderCallback(this){
         @Override
         public void onManagerConnected(int status){
@@ -138,6 +142,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 		this.mqttPrefix = prefs.getString("mqtt_path", "aruco/markers");
 
+		this.mqttStatusText = (TextView) findViewById(R.id.text_mqtt_status);
+
 		connectMQTT();
 	}
 
@@ -159,6 +165,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 	@Override
     public void onPause(){
 		super.onPause();
+
+		finish();
     }
 
 	@Override
@@ -178,7 +186,13 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 		 */
 
 		if(mqttClient != null) {
-			mqttClient.close();
+			Log.d("MQTT", "closing connection");
+            try {
+                mqttClient.disconnect();
+            } catch (MqttException e) {
+                throw new RuntimeException(e);
+            }
+            mqttClient.close();
 		}
     }
 
@@ -283,31 +297,34 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 				 // At this point: rvec_rel and t_rel give pose relative to marker 0
 				 int markerId = (int) ids.get(i, 0)[0];
-				 if(markerId != this.originMarkerIndex) {
-					 // Log.d("Relative", String.format("XYZ: %f %f %f", t_rel.get(0, 0)[0], t_rel.get(1, 0)[0], t_rel.get(2, 0)[0]));
-					 if(mqttClient.isConnected()) {
-						 try {
-							 JSONObject position = new JSONObject();
-							 position.put("x", t_offset.get(0, 0)[0]);
-							 position.put("y", t_offset.get(1, 0)[0]);
-							 position.put("z", t_offset.get(2, 0)[0]);
 
-							 JSONObject rotation = new JSONObject();
-							 rotation.put("x", rvec_rel.get(0, 0)[0]);
-							 rotation.put("y", rvec_rel.get(1, 0)[0]);
-							 rotation.put("z", rvec_rel.get(2, 0)[0]);
+				 if(mqttClient.isConnected()) {
+					 try {
+						 JSONObject position = new JSONObject();
+						 position.put("x", t_offset.get(0, 0)[0]);
+						 position.put("y", t_offset.get(1, 0)[0]);
+						 position.put("z", t_offset.get(2, 0)[0]);
 
-							 JSONObject object = new JSONObject();
-							 object.put("position", position);
-							 object.put("rotation", rotation);
+						 JSONObject rotation = new JSONObject();
+						 rotation.put("x", rvec_rel.get(0, 0)[0]);
+						 rotation.put("y", rvec_rel.get(1, 0)[0]);
+						 rotation.put("z", rvec_rel.get(2, 0)[0]);
 
-							 markers.put(String.valueOf(markerId), object);
-							 publishMqtt = true;
-						 } catch (JSONException e) {
-							 throw new RuntimeException(e);
+						 JSONObject object = new JSONObject();
+						 object.put("position", position);
+						 object.put("rotation", rotation);
+
+						 if(markerId == this.originMarkerIndex) {
+							 // Log.d("Relative", String.format("XYZ: %f %f %f", t_rel.get(0, 0)[0], t_rel.get(1, 0)[0], t_rel.get(2, 0)[0]));
+							 object.put("origin", true);
 						 }
+
+						 markers.put(String.valueOf(markerId), object);
+						 publishMqtt = true;
+					 } catch (JSONException e) {
+						 throw new RuntimeException(e);
 					 }
-                 }
+				 }
 				 /*
 				 Log.d("Relative", "Marker ID " + ids.get(i, 0)[0] + " relative to marker 0:");
 				 Log.d("Relative", "Rotation vector: " + rvec_rel.dump());
@@ -393,6 +410,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 	}
 
 	private void connectMQTT(){
+		mqttStatusText.setText("MQTT: connecting...");
+
 		String URI = prefs.getString("mqtt_uri", "");
 		if(URI.isEmpty()) {
 			toast("No MQTT URI configured");
@@ -409,6 +428,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 			public void connectComplete(boolean reconnect, String serverURI) {
 				Log.d("MQTT", "reconnect: " + reconnect);
 				toast("MQTT (re)connected.");
+				mqttStatusText.setText("MQTT: connected");
+				mqttStatusText.setTextColor(Color.GREEN);
 			}
 
 			@Override
@@ -416,6 +437,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 				Log.d("MQTT", "connectionLost: " + cause);
 				toast("mqtt connection lost. reconnecting...");
 
+				mqttStatusText.setText("MQTT: disconnected");
+				mqttStatusText.setTextColor(Color.RED);
 			}
 
 			@Override
@@ -446,11 +469,17 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 					Log.d("MQTT", "Connection failure: ");
 					exception.printStackTrace();
 					toast("MQTT connection failure. URI correct?");
+					mqttStatusText.setText("MQTT: connection failed");
+					mqttStatusText.setTextColor(Color.RED);
                 }
             });
         } catch (MqttException e) {
+			mqttStatusText.setText("MQTT: MQTT error");
+			mqttStatusText.setTextColor(Color.RED);
             e.printStackTrace();
         } catch (Exception e) {
+			mqttStatusText.setText("MQTT: config?");
+			mqttStatusText.setTextColor(Color.RED);
 			e.printStackTrace();
 			toast("MQTT configuration wrong, probably.");
 		}

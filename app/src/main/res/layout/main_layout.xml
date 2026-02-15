@@ -72,5 +72,26 @@
 
 	</LinearLayout>
 
+	<LinearLayout
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:gravity="center_vertical"
+		android:layout_gravity="bottom|left"
+		android:clipToPadding="false">
+
+		<TextView
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="MQTT: idle"
+			android:textSize="20dp"
+			android:textStyle="bold"
+			android:layout_margin="20dp"
+			android:id="@+id/text_mqtt_status"
+			android:textColor="@android:color/white">
+
+		</TextView>
+
+	</LinearLayout>
+
 </android.support.design.widget.CoordinatorLayout>
 
