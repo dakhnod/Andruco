@@ -14,6 +14,7 @@ import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
@@ -180,7 +181,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
             try {
                 mqttClient.disconnect();
 				mqttClient.close();
-            } catch (MqttException e) {
+            } catch (MqttException | IllegalArgumentException e) {
 				Log.e("MQTT", "Error terminating MQTT conection, but whatever...");
                 // throw new RuntimeException(e);
             }
