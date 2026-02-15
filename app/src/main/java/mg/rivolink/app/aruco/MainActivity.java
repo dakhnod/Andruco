@@ -177,22 +177,15 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         if (camera != null)
             camera.disableView();
 
-		/*
-        try {
-            mqttClient.disconnect();
-        } catch (MqttException e) {
-            e.printStackTrace();
-        }
-		 */
-
 		if(mqttClient != null) {
 			Log.d("MQTT", "closing connection");
             try {
                 mqttClient.disconnect();
+				mqttClient.close();
             } catch (MqttException e) {
-                throw new RuntimeException(e);
+				Log.e("MQTT", "Error terminating MQTT conection, but whatever...");
+                // throw new RuntimeException(e);
             }
-            mqttClient.close();
 		}
     }
 
