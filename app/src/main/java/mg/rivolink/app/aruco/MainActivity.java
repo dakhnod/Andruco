@@ -69,13 +69,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 	private MatOfDouble distCoeffs;
 
 	private Mat rgb;
-	private Mat gray;
 
-	private Mat rvecs;
-	private Mat tvecs;
-
-	private MatOfInt ids;
-	private List<Mat> corners;
+    private List<Mat> corners;
 	private Dictionary dictionary;
 	private DetectorParameters parameters;
 
@@ -89,6 +84,11 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 	private TextView mqttStatusText;
 
+	private Mat originTvec;
+	private Mat originRvec;
+
+	private boolean originDataAvailable = false;
+
 	private final BaseLoaderCallback loaderCallback = new BaseLoaderCallback(this){
         @Override
         public void onManagerConnected(int status){
@@ -97,7 +97,10 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 				
 				cameraMatrix = Mat.eye(3, 3, CvType.CV_64FC1);
 				distCoeffs = new MatOfDouble(Mat.zeros(5, 1, CvType.CV_64FC1));
-				
+
+				originTvec = new Mat(3, 1, CvType.CV_64F);
+				originRvec = new Mat(3, 1, CvType.CV_64F);
+
 				if(CameraParameters.fileExists(activity)){
 					CameraParameters.tryLoad(activity, cameraMatrix, distCoeffs);
 				}
@@ -211,9 +214,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 		}
 		
 		Imgproc.cvtColor(inputFrame.rgba(), rgb, Imgproc.COLOR_RGBA2RGB);
-		gray = inputFrame.gray();
+        Mat gray = inputFrame.gray();
 
-		ids = new MatOfInt();
+        MatOfInt ids = new MatOfInt();
 		corners.clear();
 
 		Aruco.detectMarkers(gray, dictionary, corners, ids, parameters);
@@ -224,13 +227,10 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 		Aruco.drawDetectedMarkers(rgb, corners, ids);
 
-		rvecs = new Mat();
-		tvecs = new Mat();
+        Mat rvecs = new Mat();
+        Mat tvecs = new Mat();
 
 		Aruco.estimatePoseSingleMarkers(corners, SIZE, cameraMatrix, distCoeffs, rvecs, tvecs);
-
-		Mat originTvec = new Mat(3, 1, CvType.CV_64F);
-		Mat originRvec = new Mat(3, 1, CvType.CV_64F);
 
 		boolean originFound = false;
 
@@ -239,112 +239,113 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 				originTvec.put(0, 0, tvecs.get(i, 0));
 				originRvec.put(0, 0, rvecs.get(i, 0));
 
-				originFound = true;
+				originFound = originDataAvailable = true;
 			}
 		}
 
-		 if(originFound) {
-			 Mat R0 = new Mat();
-			 Calib3d.Rodrigues(
-					 originRvec,
-					 R0
-			 );
-			 Mat R0_inv = R0.t();
+		if(originDataAvailable) {
+			publishMarkers(ids, tvecs, rvecs, originFound);
+		}
 
-			 Mat T0 = originTvec.t();
-			 Mat T0_inv = new Mat();
-			 Core.gemm(R0_inv, originTvec, -1, new Mat(), 0, T0_inv);
-
-			 JSONObject markers = new JSONObject();
-			 boolean publishMqtt = false;
-
-			 for (int i = 0; i < ids.rows(); i++) {
-				 Mat tvec = new Mat(3, 1, CvType.CV_64F);
-				 Mat rvec = new Mat(3, 1, CvType.CV_64F);
-
-				 tvec.put(0, 0, tvecs.get(i, 0));
-				 rvec.put(0, 0, rvecs.get(i, 0));
-
-				 // Convert to rotation matrix
-				 Mat R = new Mat();
-				 Calib3d.Rodrigues(rvec, R);
-
-				 // Transform rotation
-				 Mat R_rel = new Mat();
-				 Core.gemm(R0_inv, R, 1, new Mat(), 0, R_rel);
-
-				 // Transform translation
-				 Mat t = tvec.t();
-				 Mat t_diff = new Mat();
-				 Core.subtract(t, originTvec.t(), t_diff);
-
-				 Mat t_rel = new Mat();
-				 Core.gemm(R0_inv, t_diff.t(), 1, new Mat(), 0, t_rel);
-
-				 // Convert back to rvec
-				 Mat rvec_rel = new Mat();
-				 Calib3d.Rodrigues(R_rel, rvec_rel);
-
-				 Mat t_offset = new Mat();
-				 Core.add(t_rel, originMarker0Position, t_offset);
-
-				 // At this point: rvec_rel and t_rel give pose relative to marker 0
-				 int markerId = (int) ids.get(i, 0)[0];
-
-				 if(mqttClient.isConnected()) {
-					 try {
-						 JSONObject position = new JSONObject();
-						 position.put("x", t_offset.get(0, 0)[0]);
-						 position.put("y", t_offset.get(1, 0)[0]);
-						 position.put("z", t_offset.get(2, 0)[0]);
-
-						 JSONObject rotation = new JSONObject();
-						 rotation.put("x", rvec_rel.get(0, 0)[0]);
-						 rotation.put("y", rvec_rel.get(1, 0)[0]);
-						 rotation.put("z", rvec_rel.get(2, 0)[0]);
-
-						 JSONObject object = new JSONObject();
-						 object.put("position", position);
-						 object.put("rotation", rotation);
-
-						 if(markerId == this.originMarkerIndex) {
-							 // Log.d("Relative", String.format("XYZ: %f %f %f", t_rel.get(0, 0)[0], t_rel.get(1, 0)[0], t_rel.get(2, 0)[0]));
-							 object.put("origin", true);
-						 }
-
-						 markers.put(String.valueOf(markerId), object);
-						 publishMqtt = true;
-					 } catch (JSONException e) {
-						 throw new RuntimeException(e);
-					 }
-				 }
-				 /*
-				 Log.d("Relative", "Marker ID " + ids.get(i, 0)[0] + " relative to marker 0:");
-				 Log.d("Relative", "Rotation vector: " + rvec_rel.dump());
-				 Log.d("Relative", "Translation vector: " + t_rel.t().dump()); // transpose back to row
-				 */
-			 }
-
-			 // only publish if at least one marker is available
-			 if(publishMqtt) {
-				 try {
-					 JSONObject payload = new JSONObject();
-					 payload.put("markers", markers);
-					 payload.put("timestamp", (new Date()).getTime());
-					 mqttClient.publish(this.mqttPrefix, payload.toString().getBytes(), 0, false);
-				 } catch (JSONException | MqttException e) {
-					 throw new RuntimeException(e);
-				 }
-			 }
-		 }
-
-
-		for(int i = 0;i<ids.toArray().length;i++){
+		for(int i = 0; i< ids.toArray().length; i++){
 			draw3dCube(rgb, cameraMatrix, distCoeffs, rvecs.row(i), tvecs.row(i), new Scalar(255, 0, 0));
 			Aruco.drawAxis(rgb, cameraMatrix, distCoeffs, rvecs.row(i), tvecs.row(i), SIZE/2.0f);
 		}
 
 		return rgb;
+	}
+
+	private void publishMarkers(MatOfInt ids, Mat tvecs, Mat rvecs, boolean originFound) {
+		Mat R0 = new Mat();
+		Calib3d.Rodrigues(
+				originRvec,
+				R0
+		);
+		Mat R0_inv = R0.t();
+
+		Mat T0 = originTvec.t();
+		Mat T0_inv = new Mat();
+		Core.gemm(R0_inv, originTvec, -1, new Mat(), 0, T0_inv);
+
+		JSONObject markers = new JSONObject();
+		boolean publishMqtt = false;
+
+		for (int i = 0; i < ids.rows(); i++) {
+			Mat tvec = new Mat(3, 1, CvType.CV_64F);
+			Mat rvec = new Mat(3, 1, CvType.CV_64F);
+
+			tvec.put(0, 0, tvecs.get(i, 0));
+			rvec.put(0, 0, rvecs.get(i, 0));
+
+			// Convert to rotation matrix
+			Mat R = new Mat();
+			Calib3d.Rodrigues(rvec, R);
+
+			// Transform rotation
+			Mat R_rel = new Mat();
+			Core.gemm(R0_inv, R, 1, new Mat(), 0, R_rel);
+
+			// Transform translation
+			Mat t = tvec.t();
+			Mat t_diff = new Mat();
+			Core.subtract(t, originTvec.t(), t_diff);
+
+			Mat t_rel = new Mat();
+			Core.gemm(R0_inv, t_diff.t(), 1, new Mat(), 0, t_rel);
+
+			// Convert back to rvec
+			Mat rvec_rel = new Mat();
+			Calib3d.Rodrigues(R_rel, rvec_rel);
+
+			Mat t_offset = new Mat();
+			Core.add(t_rel, originMarker0Position, t_offset);
+
+			// At this point: rvec_rel and t_rel give pose relative to marker 0
+			int markerId = (int) ids.get(i, 0)[0];
+
+			if(mqttClient.isConnected()) {
+				try {
+					JSONObject position = new JSONObject();
+					position.put("x", t_offset.get(0, 0)[0]);
+					position.put("y", t_offset.get(1, 0)[0]);
+					position.put("z", t_offset.get(2, 0)[0]);
+
+					JSONObject rotation = new JSONObject();
+					rotation.put("x", rvec_rel.get(0, 0)[0]);
+					rotation.put("y", rvec_rel.get(1, 0)[0]);
+					rotation.put("z", rvec_rel.get(2, 0)[0]);
+
+					JSONObject object = new JSONObject();
+					object.put("position", position);
+					object.put("rotation", rotation);
+
+					if(markerId == this.originMarkerIndex) {
+						// Log.d("Relative", String.format("XYZ: %f %f %f", t_rel.get(0, 0)[0], t_rel.get(1, 0)[0], t_rel.get(2, 0)[0]));
+						object.put("origin", true);
+					}
+
+					markers.put(String.valueOf(markerId), object);
+					publishMqtt = true;
+				} catch (JSONException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}
+
+		if(!publishMqtt) {
+			return;
+		}
+
+		// only publish if at least one marker is available
+		try {
+			JSONObject payload = new JSONObject();
+			payload.put("markers", markers);
+			payload.put("timestamp", (new Date()).getTime());
+			payload.put("originFound", originFound);
+			mqttClient.publish(this.mqttPrefix, payload.toString().getBytes(), 0, false);
+		} catch (JSONException | MqttException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	@Override
