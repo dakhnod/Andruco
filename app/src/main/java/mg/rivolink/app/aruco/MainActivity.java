@@ -305,15 +305,15 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 			if(mqttClient.isConnected()) {
 				try {
-					JSONObject position = new JSONObject();
-					position.put("x", t_offset.get(0, 0)[0]);
-					position.put("y", t_offset.get(1, 0)[0]);
-					position.put("z", t_offset.get(2, 0)[0]);
+					JSONArray position = new JSONArray();
+					for(int j = 0; j < 3; j++) {
+						position.put(t_offset.get(j, 0)[0]);
+					}
 
-					JSONObject rotation = new JSONObject();
-					rotation.put("x", rvec_rel.get(0, 0)[0]);
-					rotation.put("y", rvec_rel.get(1, 0)[0]);
-					rotation.put("z", rvec_rel.get(2, 0)[0]);
+					JSONArray rotation = new JSONArray();
+					for(int j = 0; j < 3; j++) {
+						rotation.put(rvec_rel.get(j, 0)[0]);
+					}
 
 					JSONObject object = new JSONObject();
 					object.put("position", position);
