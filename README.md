@@ -1,32 +1,40 @@
-# Aruco Android
+# Aruco MQTT Android
 
-It is an application to detect Aruco Markers and stream the data to MQTT.
+An application to detect Aruco Markers and stream the data to MQTT on your phone.
+
+This app was created as an alternative to building a rig with a Raspberry Pi, a battery, screen etc...
+
+Ideally, the phone can just be mounted on a tripod and overlook your frame.
 
 <center>
-	<img width="75%" src="screenshots/marker_drawing_axis.png" alt="screenshot_home" />
+	<img width="745" height="724" alt="image" src="https://github.com/user-attachments/assets/af225db6-c365-44da-acb1-d04bf02e7a5d" />
+
 </center>
 
 ## Usage
 
-When any of the two applications reports an error with the camera, try giving it camera permissions by hand (through the OS settings).
+Firstly, download and install APKs. They are big, since both contain the whole OpenCV library, which is no joke sizewise.
+
+Then, manually give permissions to use the camera to both apps.
 
 Open the calibration app and tap on the image, until the thin text on the bottom left shows 15/15 pictures.
-If there is no text, just take 15 pictures, before clicking on OK.
+Each image should contain at least 10 markers from (the board)[calibration-board.jpg].
+Try many different angles and spots on the screen, so the algorithm can best figure out the distortion of your camera.
+If there is no text (you really have to focus in order to see it), just take 15 pictures, before clicking on OK.
 Save the file somewhere on the SD card.
 
 
 Afterwards, you can open the main App.
 It will ask for the calibration file first.
 
-Also, it will complaining about not having camera permissions.
-Give the permissions manually.
+Again, don't forget to give camera permissions through your OS.
 
 Then, you can tap on the wrench and set your settings.
 Setting coordinates for the origin marker shifts the whole coordinate system.
 
-Currently, coordinates are only published when the origin marker is visible.
-Coordinates of other markers than the origin will be aligned to the origins coordinate system.
-The origin marker will not be published via MQTT, since it's location is known (`0, 0` by default)
+When the origin marker is visible, all other markers are oriented in the coordinate system of the origin marker.
+If the origin marker is not visible, the app just uses it's last known position.
+The origin marker is be published via MQTT with the `origin` attribute set to `true`.
 
 If no markers are found, change the dictionary type.
 
@@ -111,5 +119,6 @@ Thank you :)
 You can see in the repository below another marker detection application which uses [Vuforia](https://library.vuforia.com/) library.
 
 [https://github.com/RivoLink/Vuforia-Android](https://github.com/RivoLink/Vuforia-Android)
+
 
 
