@@ -248,7 +248,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 		}
 
 		for(int i = 0; i< ids.toArray().length; i++){
-			draw3dCube(rgb, cameraMatrix, distCoeffs, rvecs.row(i), tvecs.row(i), new Scalar(255, 0, 0));
+			Scalar color = (ids.get(i, 0)[0] == originMarkerIndex) ? new Scalar(0, 255, 0) : new Scalar(255, 0, 0);
+			draw3dCube(rgb, cameraMatrix, distCoeffs, rvecs.row(i), tvecs.row(i), color);
 			Aruco.drawAxis(rgb, cameraMatrix, distCoeffs, rvecs.row(i), tvecs.row(i), SIZE/2.0f);
 		}
 
