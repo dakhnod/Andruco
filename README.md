@@ -1,5 +1,7 @@
 # Aruco MQTT Android
 
+[Demo video](https://youtu.be/V-IwKoQqENc)
+
 An application to detect Aruco Markers and stream the data to MQTT on your phone.
 
 This app was created as an alternative to building a rig with a Raspberry Pi, a battery, screen etc...
@@ -119,6 +121,7 @@ Thank you :)
 You can see in the repository below another marker detection application which uses [Vuforia](https://library.vuforia.com/) library.
 
 [https://github.com/RivoLink/Vuforia-Android](https://github.com/RivoLink/Vuforia-Android)
+
 
 
 
